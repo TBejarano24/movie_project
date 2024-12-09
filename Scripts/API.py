@@ -118,6 +118,7 @@ for page in range(1, 6):
     #Se crea un cursor para ejecutar consultas SQL
     cursor = conn.cursor()
 
+    #Primer consulta que se va a realizar (Traer datos actualizados a una tabla)
     query1 = """
     IF NOT EXISTS(SELECT 1 FROM Movies WHERE title = ?)
     BEGIN
@@ -129,7 +130,7 @@ for page in range(1, 6):
     END
     """
     
-    #La consulta que se va a realizar (Esta es la parte que falla)
+    #La segunda consulta que se va a realizar (Comparar ambas tablas para mantener datos actualizados y precisos)
     query2 = """
     MERGE Updated_Movie_Data AS TARGET
     USING Movies AS SOURCE
