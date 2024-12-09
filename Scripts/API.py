@@ -118,8 +118,7 @@ for page in range(1, 6):
     #Se crea un cursor para ejecutar consultas SQL
     cursor = conn.cursor()
 
-    #La consulta que se va a realizar (Esta es la parte que falla)
-    query2 = """
+    query1 = """
     IF NOT EXISTS(SELECT 1 FROM Movies WHERE title = ?)
     BEGIN
         INSERT INTO Movies(title, release_date, original_language, vote_average, vote_count, popularity, overview, genres)
@@ -128,36 +127,35 @@ for page in range(1, 6):
         INSERT INTO Movie_Popularity(movieID, title, popularity_category)
         VALUES(@@IDENTITY, ?, ?)
     END
-    ELSE
-    BEGIN
-        MERGE Updated_Movie_Data AS TARGET
-        USING Movies AS SOURCE
+    """
     
-            ON (TARGET.movieID = SOURCE.movieID)
-        WHEN MATCHED
-            AND TARGET.title <> SOURCE.title
-            OR TARGET.vote_average <> SOURCE.vote_average
-            OR TARGET.vote_count <> SOURCE.vote_count
-            OR TARGET.popularity <> SOURCE.popularity
-        THEN
-            UPDATE
-                SET TARGET.title = SOURCE.title
-                SET TARGET.release_date = SOURCE.release_date
-                SET TARGET.original_language = SOURCE.original_language
-                SET TARGET.vote_average = SOURCE.vote_average
-                SET TARGET.vote_count = SOURCE.vote_count
-                SET TARGET.popularity = SOURCE.popularity
-                SET TARGET.overview = SOURCE.overview
-                SET TARGET.genres = SOURCE.genres
-        
-        WHEN NOT MATCHED BY TARGET
-            THEN 
-                INSERT(title, release_date, original_language, vote_average, vote_count, popularity, overview, genres)
-                VALUES(SOURCE.title, SOURCE.release_date, SOURCE.original_language, SOURCE.vote_average, SOURCE.vote_count, SOURCE.popularity, SOURCE.overview, SOURCE.genres)
-    
-        WHEN NOT MATCHED BY SOURCE
-            THEN DELETE;
-    END
+    #La consulta que se va a realizar (Esta es la parte que falla)
+    query2 = """
+    MERGE Updated_Movie_Data AS TARGET
+    USING Movies AS SOURCE
+        ON (TARGET.movieID = SOURCE.movieID)
+    WHEN MATCHED 
+        AND (TARGET.title <> SOURCE.title
+        OR TARGET.vote_average <> SOURCE.vote_average
+        OR TARGET.vote_count <> SOURCE.vote_count
+        OR TARGET.popularity <> SOURCE.popularity)
+    THEN
+        UPDATE SET
+            TARGET.movieID = SOURCE.movieID,
+            TARGET.title = SOURCE.title,
+            TARGET.release_date = SOURCE.release_date,
+            TARGET.original_language = SOURCE.original_language,
+            TARGET.vote_average = SOURCE.vote_average,
+            TARGET.vote_count = SOURCE.vote_count,
+            TARGET.popularity = SOURCE.popularity,
+            TARGET.overview = SOURCE.overview,
+            TARGET.genres = SOURCE.genres
+    WHEN NOT MATCHED BY TARGET
+    THEN 
+        INSERT (movieID, title, release_date, original_language, vote_average, vote_count, popularity, overview, genres)
+        VALUES (SOURCE.movieID, SOURCE.title, SOURCE.release_date, SOURCE.original_language, SOURCE.vote_average, SOURCE.vote_count, SOURCE.popularity, SOURCE.overview, SOURCE.genres)
+    WHEN NOT MATCHED BY SOURCE
+    THEN DELETE;
     """
 
     #Se crea un índice para iterar sobre cada una de las películas de cada página
@@ -176,17 +174,21 @@ for page in range(1, 6):
         decipher_genre(data_movies['results'][i]['genre_ids'], data_genres, genres)
         
         #Se ejecuta la consulta SQL y se insertan los valores apropiados
-        cursor.execute(query2, data_movies['results'][i]['title'],
+        cursor.execute(query1, data_movies['results'][i]['title'],
                     data_movies['results'][i]['title'], data_movies['results'][i]['release_date'], data_movies['results'][i]['original_language'], data_movies['results'][i]['vote_average'], data_movies['results'][i]['vote_count'], data_movies['results'][i]['popularity'], data_movies['results'][i]['overview'], str(genres),
                     data_movies['results'][i]['title'], calculate_popularity(data_movies['results'][i]['popularity'], most_popular))
         
         print('Done!')
 
+    cursor.execute(query2)
+    
     #Se guardan los cambios y se cierra al conexión
     conn.commit()
     conn.close()
 
     print(f"Page {page} finished")
-    
+
+
+
 #Se ejecuta la función para importar como CSV
 import_as_csv(driver, '.\SQLEXPRESS', 'movie_db', 'Movies', uid, pwd, csv_path)
